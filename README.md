@@ -1,5 +1,7 @@
 # jev-benchmark
 
+> 📖 **Read the write-up:** [I Benchmarked Jev on Agent Tool-Call Risk. Calibration Held.](https://webofmike.com/jev-benchmark/)
+
 A reproducible benchmark for **TypeSafe AI's Jev** on a real agent-infrastructure task:
 classifying an agent tool call as `readonly`, `destructive`, `privileged`, or `exfiltration`.
 
