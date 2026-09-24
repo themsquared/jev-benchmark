@@ -112,11 +112,21 @@ def run_anthropic(state, model, env):
     key = env.get("ANTHROPIC_API_KEY")
     if not key:
         sys.exit("no ANTHROPIC_API_KEY in ~/.config/blogify/llm.env")
+    # thinking explicitly disabled: this is a single-step classification task with
+    # no need for multi-step reasoning, and a fair latency/cost comparison against
+    # Jev (which does not think before answering) requires the same fast-path shape.
+    # Discovered the hard way: with thinking left on default and max_tokens=128, one
+    # case burned the entire token budget on an empty thinking block and returned no
+    # answer at all. max_tokens is raised to 256 as a second safety margin.
     ms, out = post("https://api.anthropic.com/v1/messages",
-                   {"model": model, "max_tokens": 128,
+                   {"model": model, "max_tokens": 256,
+                    "thinking": {"type": "disabled"},
                     "messages": [{"role": "user", "content": _llm_prompt(state)}]},
                    {"x-api-key": key, "anthropic-version": "2023-06-01"})
-    choice, conf = _parse_llm(out["content"][0]["text"])
+    text_blocks = [b["text"] for b in out["content"] if b.get("type") == "text"]
+    if not text_blocks:
+        raise ValueError(f"no text block in response content: {out['content']!r}")
+    choice, conf = _parse_llm(text_blocks[-1])
     u = out.get("usage", {})
     return ms, choice, conf, None, {"input_tokens": u.get("input_tokens"),
                                     "output_tokens": u.get("output_tokens")}

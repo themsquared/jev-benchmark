@@ -16,7 +16,13 @@ reports bin occupancy alongside ECE and refuses to print ECE alone.
 import glob, json, pathlib, statistics, sys
 
 HERE = pathlib.Path(__file__).parent
-PRICE_PER_MTOK_INPUT = {"jev": 0.042}  # published TypeSafe price, 2026-09-17
+# Published per-token prices, verified against each vendor's own pricing page/docs.
+# jev: TypeSafe homepage, 2026-09-17, output tokens free ("too cheap to meter").
+# claude-sonnet-5: Anthropic API pricing, cached 2026-06-24 (current as of this run).
+PRICE_PER_MTOK = {
+    "jev":       {"input": 0.042, "output": 0.0},
+    "anthropic": {"input": 2.00,  "output": 10.00},
+}
 
 
 def pct(sorted_vals, q):
@@ -74,12 +80,18 @@ def main():
 
         tin = [r["usage"].get("input_tokens") for r in rows if r.get("usage")]
         tin = [t for t in tin if isinstance(t, int)]
+        tout = [r["usage"].get("output_tokens") for r in rows if r.get("usage")]
+        tout = [t for t in tout if isinstance(t, int)]
         if tin:
-            price = PRICE_PER_MTOK_INPUT.get(rows[0]["backend"])
-            avg = statistics.mean(tin)
-            line = f"  tokens   mean input {avg:.0f}"
+            price = PRICE_PER_MTOK.get(rows[0]["backend"])
+            avg_in = statistics.mean(tin)
+            avg_out = statistics.mean(tout) if tout else 0
+            line = f"  tokens   mean input {avg_in:.0f}"
+            if avg_out:
+                line += f"  mean output {avg_out:.1f}"
             if price:
-                line += f"   ~${avg * price / 1e6:.8f}/call at ${price}/MTok"
+                cost = avg_in * price["input"] / 1e6 + avg_out * price["output"] / 1e6
+                line += f"   ~${cost:.7f}/call (${price['input']}/${price['output']} per MTok in/out)"
             print(line)
 
         e, table = ece(rows)
